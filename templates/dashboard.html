@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Milk Tracker</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<h2>{{ month }} {{ year }}</h2>
+<p>Price per day: ₹{{ price }}</p>
+
+<form method="POST" action="/update-price" style="margin: 10px 0;">
+    <label><b>Price per day (₹)</b></label><br>
+    <input 
+        type="number" 
+        name="price" 
+        value="{{ price }}" 
+        min="1"
+        required
+        style="width: 80px; text-align: center;"
+    >
+    <button type="submit">Update</button>
+</form>
+
+
+<table>
+<tr>
+    {% for d in days %}
+        <td>
+            <form method="POST" action="/toggle">
+                <input type="hidden" name="day" value="{{ d }}">
+                <button class="{{ 'taken' if logs.get(d) and logs[d].taken else 'not-taken' }}">
+                    {{ d }}
+                </button>
+            </form>
+        </td>
+        {% if d % 7 == 0 %}</tr><tr>{% endif %}
+    {% endfor %}
+</tr>
+</table>
+
+<h3>Monthly Bill: ₹{{ bill }}</h3>
+
+<a href="/logout">Logout</a>
+
+</body>
+</html>
