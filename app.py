@@ -1,7 +1,6 @@
-from flask import Flask, render_template, request, redirect, session
+from flask import Flask, render_template, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from datetime import date
-import calendar
+from datetime import date, datetime
 
 app = Flask(__name__)
 app.secret_key = "milk-secret-key"
@@ -11,127 +10,186 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
 
-# ------------------ MODELS ------------------
+# --------------------------------------------------
+# CONSTANTS
+# --------------------------------------------------
+DEFAULT_USER_ID = 1
+
+# --------------------------------------------------
+# MODELS
+# --------------------------------------------------
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(50), unique=True, nullable=False)
+    name = db.Column(db.String(50), unique=True)
 
 class MilkLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, nullable=False)
-    day = db.Column(db.Date, nullable=False)
-    taken = db.Column(db.Boolean, default=False)
+    user_id = db.Column(db.Integer)
+    day = db.Column(db.Date)
+    quantity = db.Column(db.Integer)  # 1 or 2
 
-class Settings(db.Model):
+class MonthlyPrice(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    price_per_day = db.Column(db.Integer, nullable=False)
+    user_id = db.Column(db.Integer)
+    year = db.Column(db.Integer)
+    month = db.Column(db.Integer)
+    price = db.Column(db.Integer)
 
-# ------------------ INIT DB (Flask 3.x SAFE) ------------------
+# --------------------------------------------------
+# INIT DB
+# --------------------------------------------------
 
 def init_db():
     with app.app_context():
         db.create_all()
-
-        # Seed data only once
         if not User.query.first():
-            db.session.add_all([
-                User(name="Rushi"),
-                User(name="Shruti")
-            ])
-            db.session.add(Settings(price_per_day=80))
+            db.session.add(User(name="Milk User"))
             db.session.commit()
 
-# ------------------ LOGIN ------------------
+# --------------------------------------------------
+# SPLASH / BANNER PAGE
+# --------------------------------------------------
 
-@app.route("/", methods=["GET", "POST"])
-def login():
-    if request.method == "POST":
-        session["user_id"] = request.form["user_id"]
-        return redirect("/dashboard")
+@app.route("/")
+def splash():
+    return render_template("splash.html")
 
-    users = User.query.all()
-    return render_template("login.html", users=users)
-
-# ------------------ DASHBOARD ------------------
+# --------------------------------------------------
+# DASHBOARD
+# --------------------------------------------------
 
 @app.route("/dashboard")
 def dashboard():
-    user_id = session.get("user_id")
-    if not user_id:
-        return redirect("/")
-
-    user_id = int(user_id)
     today = date.today()
-    year = today.year
-    month = today.month
-
-    days_in_month = calendar.monthrange(year, month)[1]
-
-    logs = {
-        log.day.day: log
-        for log in MilkLog.query.filter_by(user_id=user_id)
-        if log.day.month == month and log.day.year == year
-    }
-
-    price = Settings.query.first().price_per_day
-    taken_days = sum(1 for log in logs.values() if log.taken)
-    bill = taken_days * price
+    year = int(request.args.get("year", today.year))
+    month = int(request.args.get("month", today.month))
 
     return render_template(
         "dashboard.html",
-        days=range(1, days_in_month + 1),
-        logs=logs,
-        price=price,
-        bill=bill,
-        month=today.strftime("%B"),
-        year=year
+        year=year,
+        month=month
     )
 
-# ------------------ TOGGLE MILK ------------------
+# --------------------------------------------------
+# API: MONTH DATA
+# --------------------------------------------------
 
-@app.route("/toggle", methods=["POST"])
-def toggle():
-    user_id = int(session.get("user_id"))
-    day = int(request.form["day"])
+@app.route("/api/month")
+def api_month():
+    user_id = DEFAULT_USER_ID
+
+    year = int(request.args["year"])
+    month = int(request.args["month"])
 
     today = date.today()
-    log_date = date(today.year, today.month, day)
+    is_current_month = (year == today.year and month == today.month)
 
-    log = MilkLog.query.filter_by(user_id=user_id, day=log_date).first()
+    # Milk logs
+    logs = MilkLog.query.filter(
+        MilkLog.user_id == user_id,
+        db.extract("year", MilkLog.day) == year,
+        db.extract("month", MilkLog.day) == month
+    ).all()
 
-    if log:
-        log.taken = not log.taken
+    days = {log.day.strftime("%Y-%m-%d"): log.quantity for log in logs}
+
+    # Monthly price (applies only to that month)
+    price_row = MonthlyPrice.query.filter_by(
+        user_id=user_id,
+        year=year,
+        month=month
+    ).first()
+
+    price = price_row.price if price_row else 0
+
+    total_qty = sum(days.values())
+    milk_days = len(days)
+    total_bill = total_qty * price
+
+    return jsonify({
+        "editable": is_current_month,
+        "days": days,
+        "summary": {
+            "milk_days": milk_days,
+            "total_quantity": total_qty,
+            "price": price,
+            "total_bill": total_bill
+        }
+    })
+
+# --------------------------------------------------
+# API: SET DAY (ONLY CURRENT MONTH)
+# --------------------------------------------------
+
+@app.route("/api/day", methods=["POST"])
+def api_day():
+    user_id = DEFAULT_USER_ID
+    data = request.json
+
+    day = datetime.strptime(data["date"], "%Y-%m-%d").date()
+    qty = int(data["quantity"])
+
+    today = date.today()
+    if not (day.year == today.year and day.month == today.month):
+        return jsonify({"error": "Read only month"}), 403
+
+    log = MilkLog.query.filter_by(user_id=user_id, day=day).first()
+
+    if qty == 0:
+        if log:
+            db.session.delete(log)
+    else:
+        if log:
+            log.quantity = qty
+        else:
+            db.session.add(
+                MilkLog(
+                    user_id=user_id,
+                    day=day,
+                    quantity=qty
+                )
+            )
+
+    db.session.commit()
+    return jsonify({"success": True})
+
+# --------------------------------------------------
+# API: UPDATE PRICE (CURRENT MONTH ONLY)
+# --------------------------------------------------
+
+@app.route("/api/price", methods=["POST"])
+def api_price():
+    user_id = DEFAULT_USER_ID
+    price = int(request.json["price"])
+
+    today = date.today()
+
+    row = MonthlyPrice.query.filter_by(
+        user_id=user_id,
+        year=today.year,
+        month=today.month
+    ).first()
+
+    if row:
+        row.price = price
     else:
         db.session.add(
-            MilkLog(user_id=user_id, day=log_date, taken=True)
+            MonthlyPrice(
+                user_id=user_id,
+                year=today.year,
+                month=today.month,
+                price=price
+            )
         )
 
     db.session.commit()
-    return redirect("/dashboard")
+    return jsonify({"success": True})
 
-
-
-@app.route("/update-price", methods=["POST"])
-def update_price():
-    new_price = int(request.form["price"])
-
-    settings = Settings.query.first()
-    settings.price_per_day = new_price
-    db.session.commit()
-
-    return redirect("/dashboard")
-
-
-# ------------------ LOGOUT ------------------
-
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect("/")
-
-# ------------------ APP START ------------------
+# --------------------------------------------------
+# START
+# --------------------------------------------------
 
 if __name__ == "__main__":
     init_db()
-    app.run()
+    app.run(debug=True)

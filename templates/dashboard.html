@@ -1,47 +1,316 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Milk Tracker</title>
-    <link rel="stylesheet" href="/static/style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Milk Tracker</title>
+
+<!-- Bootstrap CSS -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+body {
+    background: #f4f6fb;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto;
+}
+
+/* iPhone container */
+.app-container {
+    max-width: 390px;
+    margin: auto;
+    min-height: 100vh;
+    background: #f4f6fb;
+}
+
+/* Header */
+.app-header {
+    background: linear-gradient(135deg, #4f8cff, #5fd3c6);
+    color: white;
+    padding: 14px;
+    text-align: center;
+    font-size: 20px;
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+/* Cards */
+.card {
+    border-radius: 18px;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+    border: none;
+}
+
+/* Calendar */
+.calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+    text-align: center;
+}
+
+.day-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+}
+
+.day {
+    background: white;
+    border-radius: 14px;
+    padding: 6px 0;
+    min-height: 62px;
+    font-size: 14px;
+    cursor: pointer;
+    position: relative;
+}
+
+.day.today {
+    border: 2px solid #4f8cff;
+}
+
+.day.selected-1 {
+    background: #5fd3c6;
+    color: white;
+}
+
+.day.selected-2 {
+    background: #4f8cff;
+    color: white;
+}
+
+.qty {
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* Summary */
+.summary-value {
+    font-weight: 600;
+}
+
+.total {
+    font-size: 20px;
+    font-weight: 700;
+    color: #4f8cff;
+}
+</style>
 </head>
-<body>
 
-<h2>{{ month }} {{ year }}</h2>
-<p>Price per day: ₹{{ price }}</p>
+<body data-year="{{ year }}" data-month="{{ month }}">
 
-<form method="POST" action="/update-price" style="margin: 10px 0;">
-    <label><b>Price per day (₹)</b></label><br>
-    <input 
-        type="number" 
-        name="price" 
-        value="{{ price }}" 
-        min="1"
-        required
-        style="width: 80px; text-align: center;"
-    >
-    <button type="submit">Update</button>
-</form>
+<div class="app-container">
 
+    <!-- Header -->
+    <div class="app-header">🥛 Milk Tracker</div>
 
-<table>
-<tr>
-    {% for d in days %}
-        <td>
-            <form method="POST" action="/toggle">
-                <input type="hidden" name="day" value="{{ d }}">
-                <button class="{{ 'taken' if logs.get(d) and logs[d].taken else 'not-taken' }}">
-                    {{ d }}
-                </button>
-            </form>
-        </td>
-        {% if d % 7 == 0 %}</tr><tr>{% endif %}
-    {% endfor %}
-</tr>
-</table>
+    <div class="p-3">
 
-<h3>Monthly Bill: ₹{{ bill }}</h3>
+        <!-- Price Card -->
+        <div class="card mb-3 p-3">
+            <label class="fw-semibold mb-2">Price per Liter</label>
+            <div class="d-flex gap-2">
+                <input type="number" class="form-control" id="price">
+                <button class="btn btn-primary" onclick="updatePrice()">Update</button>
+            </div>
+        </div>
 
-<a href="/logout">Logout</a>
+        <!-- Calendar Card -->
+        <div class="card mb-3 p-3">
+            <div class="calendar-header mb-2">
+                <button class="btn btn-sm btn-outline-secondary" onclick="changeMonth(-1)">◀</button>
+                <div id="monthYear"></div>
+                <button class="btn btn-sm btn-outline-secondary" onclick="changeMonth(1)">▶</button>
+            </div>
+
+            <div class="calendar-grid mb-2">
+                <div class="day-name">Sun</div>
+                <div class="day-name">Mon</div>
+                <div class="day-name">Tue</div>
+                <div class="day-name">Wed</div>
+                <div class="day-name">Thu</div>
+                <div class="day-name">Fri</div>
+                <div class="day-name">Sat</div>
+            </div>
+
+            <div class="calendar-grid" id="calendar"></div>
+        </div>
+
+        <!-- Summary Card -->
+        <div class="card p-3">
+            <div class="d-flex justify-content-between">
+                <span>Milk Days</span>
+                <span class="summary-value" id="days">0</span>
+            </div>
+            <div class="d-flex justify-content-between">
+                <span>Total Quantity</span>
+                <span class="summary-value" id="quantity">0 L</span>
+            </div>
+            <div class="d-flex justify-content-between mb-2">
+                <span>Price / Liter</span>
+                <span class="summary-value">₹ <span id="priceDisplay">0</span></span>
+            </div>
+            <hr>
+            <div class="d-flex justify-content-between total">
+                <span>Total Bill</span>
+                <span>₹ <span id="bill">0</span></span>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Quantity Modal -->
+<div class="modal fade" id="quantityModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4">
+      <div class="modal-header border-0">
+        <h5 class="modal-title">Select Quantity</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center">
+        <button class="btn btn-success w-100 mb-3 py-3 fs-5"
+                onclick="setQuantity(1)">
+          1 Liter
+        </button>
+        <button class="btn btn-primary w-100 mb-3 py-3 fs-5"
+                onclick="setQuantity(2)">
+          2 Liters
+        </button>
+        <button class="btn btn-outline-secondary w-100"
+                onclick="setQuantity(0)">
+          No Milk
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+/* -------- INITIAL DATA FROM SERVER -------- */
+const SERVER_YEAR = Number(document.body.dataset.year);
+const SERVER_MONTH = Number(document.body.dataset.month);
+
+let currentDate = new Date(SERVER_YEAR, SERVER_MONTH - 1, 1);
+let milkData = {};
+let editable = false;
+let selectedKey = null;
+
+/* -------- LOAD MONTH DATA -------- */
+async function loadMonth() {
+    const y = currentDate.getFullYear();
+    const m = currentDate.getMonth() + 1;
+
+    const res = await fetch(`/api/month?year=${y}&month=${m}`);
+    const data = await res.json();
+
+    milkData = data.days;
+    editable = data.editable;
+
+    document.getElementById("price").value = data.summary.price;
+    document.getElementById("priceDisplay").innerText = data.summary.price;
+    document.getElementById("days").innerText = data.summary.milk_days;
+    document.getElementById("quantity").innerText = data.summary.total_quantity + " L";
+    document.getElementById("bill").innerText = data.summary.total_bill;
+
+    renderCalendar();
+}
+
+/* -------- CALENDAR RENDER -------- */
+function renderCalendar() {
+    const calendar = document.getElementById("calendar");
+    calendar.innerHTML = "";
+
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+
+    document.getElementById("monthYear").innerText =
+        currentDate.toLocaleString("default", { month: "long", year: "numeric" });
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    for (let i = 0; i < firstDay; i++) {
+        calendar.appendChild(document.createElement("div"));
+    }
+
+    for (let day = 1; day <= daysInMonth; day++) {
+        const div = document.createElement("div");
+        div.className = "day";
+        div.innerHTML = `<div>${day}</div>`;
+
+        const key = `${year}-${String(month + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+
+        if (milkData[key]) {
+            div.classList.add(milkData[key] === 1 ? "selected-1" : "selected-2");
+            div.innerHTML += `<div class="qty">${milkData[key]}L</div>`;
+        }
+
+        const today = new Date();
+        if (day === today.getDate() &&
+            month === today.getMonth() &&
+            year === today.getFullYear()) {
+            div.classList.add("today");
+        }
+
+        if (editable) {
+            div.onclick = () => openModal(key);
+        }
+
+        calendar.appendChild(div);
+    }
+}
+
+/* -------- MODAL -------- */
+function openModal(key) {
+    selectedKey = key;
+    new bootstrap.Modal(document.getElementById("quantityModal")).show();
+}
+
+async function setQuantity(qty) {
+    await fetch("/api/day", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ date: selectedKey, quantity: qty })
+    });
+
+    bootstrap.Modal.getInstance(
+        document.getElementById("quantityModal")
+    ).hide();
+
+    loadMonth();
+}
+
+/* -------- PRICE -------- */
+async function updatePrice() {
+    const price = document.getElementById("price").value;
+    await fetch("/api/price", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ price: price })
+    });
+    loadMonth();
+}
+
+/* -------- MONTH NAV -------- */
+function changeMonth(offset) {
+    currentDate.setMonth(currentDate.getMonth() + offset);
+    loadMonth();
+}
+
+loadMonth();
+</script>
 
 </body>
 </html>
