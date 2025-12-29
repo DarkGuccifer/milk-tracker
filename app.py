@@ -1,32 +1,45 @@
 from flask import Flask, render_template, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from datetime import date, datetime
-import os
+from sqlalchemy.engine.url import URL
 
 app = Flask(__name__)
 app.secret_key = "milk-secret-key"
 
-# ---------------------------------------------
-# DATABASE CONFIG (SUPABASE)
-# ---------------------------------------------
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql://postgres:YOUR_PASSWORD@db.xxxxxx.supabase.co:5432/postgres"
-)
+# --------------------------------------------------
+# DATABASE CONFIG (SUPABASE via IP – DNS SAFE)
+# --------------------------------------------------
 
-app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
+DATABASE = {
+    "drivername": "postgresql+psycopg2",
+    "username": "postgres.bjagqrlyskreptjbikzj",
+    "password": "kzZPFVv3uW7t5OYA",
+    "database": "postgres",
+    "query": {"sslmode": "require"}
+}
+
+# IMPORTANT: hostaddr forces IP usage (bypasses DNS)
+ENGINE_OPTIONS = {
+    "connect_args": {
+        "hostaddr": "3.111.225.200",  # from nslookup
+        "port": 5432
+    }
+}
+
+app.config["SQLALCHEMY_DATABASE_URI"] = URL.create(**DATABASE)
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = ENGINE_OPTIONS
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
 
-# ---------------------------------------------
+# --------------------------------------------------
 # CONSTANTS
-# ---------------------------------------------
+# --------------------------------------------------
 DEFAULT_USER_ID = 1
 
-# ---------------------------------------------
+# --------------------------------------------------
 # MODELS
-# ---------------------------------------------
+# --------------------------------------------------
 
 class User(db.Model):
     __tablename__ = "users"
@@ -48,9 +61,9 @@ class MonthlyPrice(db.Model):
     month = db.Column(db.Integer)
     price = db.Column(db.Integer)
 
-# ---------------------------------------------
+# --------------------------------------------------
 # ROUTES
-# ---------------------------------------------
+# --------------------------------------------------
 
 @app.route("/")
 def splash():
@@ -62,15 +75,11 @@ def dashboard():
     year = int(request.args.get("year", today.year))
     month = int(request.args.get("month", today.month))
 
-    return render_template(
-        "dashboard.html",
-        year=year,
-        month=month
-    )
+    return render_template("dashboard.html", year=year, month=month)
 
-# ---------------------------------------------
+# --------------------------------------------------
 # API: MONTH DATA
-# ---------------------------------------------
+# --------------------------------------------------
 
 @app.route("/api/month")
 def api_month():
@@ -110,9 +119,9 @@ def api_month():
         }
     })
 
-# ---------------------------------------------
+# --------------------------------------------------
 # API: SET DAY
-# ---------------------------------------------
+# --------------------------------------------------
 
 @app.route("/api/day", methods=["POST"])
 def api_day():
@@ -144,9 +153,9 @@ def api_day():
     db.session.commit()
     return jsonify({"success": True})
 
-# ---------------------------------------------
+# --------------------------------------------------
 # API: UPDATE PRICE
-# ---------------------------------------------
+# --------------------------------------------------
 
 @app.route("/api/price", methods=["POST"])
 def api_price():
@@ -174,9 +183,9 @@ def api_price():
     db.session.commit()
     return jsonify({"success": True})
 
-# ---------------------------------------------
+# --------------------------------------------------
 # START
-# ---------------------------------------------
+# --------------------------------------------------
 
 if __name__ == "__main__":
     app.run(debug=True)
