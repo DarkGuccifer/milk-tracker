@@ -5,51 +5,115 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Milk Tracker</title>
 
-<!-- Bootstrap CSS -->
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 
 <style>
+/* ================= THEME VARIABLES ================= */
+:root {
+    --bg: #f4f6fb;
+    --card: #ffffff;
+    --text: #111111;
+    --muted: #555;
+    --input-bg: #ffffff;
+    --input-text: #111111;
+    --border: #dee2e6;
+}
+
+body.dark {
+    --bg: #0f172a;
+    --card: #1e293b;
+    --text: #e5e7eb;
+    --muted: #94a3b8;
+    --input-bg: #0b1220;
+    --input-text: #e5e7eb;
+    --border: #334155;
+}
+
+/* ================= BASE ================= */
 body {
-    background: #f4f6fb;
+    background: var(--bg);
+    color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto;
 }
 
-/* iPhone container */
 .app-container {
     max-width: 390px;
     margin: auto;
     min-height: 100vh;
-    background: #f4f6fb;
 }
 
-/* Header */
+/* ================= HEADER ================= */
 .app-header {
     background: linear-gradient(135deg, #4f8cff, #5fd3c6);
     color: white;
     padding: 14px;
-    text-align: center;
-    font-size: 20px;
-    font-weight: 600;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-}
-
-/* Cards */
-.card {
-    border-radius: 18px;
-    box-shadow: 0 6px 16px rgba(0,0,0,0.08);
-    border: none;
-}
-
-/* Calendar */
-.calendar-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     font-weight: 600;
 }
 
+.header-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.icon-btn {
+    background: rgba(255,255,255,0.25);
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+/* ================= CARDS ================= */
+.card {
+    background: var(--card);
+    color: var(--text);
+    border-radius: 18px;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+    border: none;
+}
+
+/* ================= INPUT FIX ================= */
+label,
+.form-check-label {
+    color: var(--text);
+}
+
+input.form-control {
+    background: var(--input-bg);
+    color: var(--input-text);
+    border: 1px solid var(--border);
+}
+
+input.form-control:focus {
+    background: var(--input-bg);
+    color: var(--input-text);
+    border-color: #4f8cff;
+    box-shadow: none;
+}
+
+/* ================= BOOTSTRAP OVERRIDES ================= */
+.text-muted,
+small {
+    color: var(--muted) !important;
+}
+
+.btn-outline-secondary {
+    color: var(--text);
+    border-color: var(--border);
+}
+
+.btn-outline-secondary:hover {
+    background: var(--border);
+    color: var(--text);
+}
+
+/* ================= CALENDAR ================= */
 .calendar-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
@@ -60,17 +124,16 @@ body {
 .day-name {
     font-size: 13px;
     font-weight: 600;
-    color: #555;
+    color: var(--muted);
 }
 
 .day {
-    background: white;
+    background: var(--card);
     border-radius: 14px;
     padding: 6px 0;
     min-height: 62px;
-    font-size: 14px;
     cursor: pointer;
-    position: relative;
+    color: var(--text);
 }
 
 .day.today {
@@ -92,15 +155,26 @@ body {
     font-weight: 600;
 }
 
-/* Summary */
+/* ================= SUMMARY ================= */
 .summary-value {
     font-weight: 600;
+    color: var(--text);
 }
 
 .total {
     font-size: 20px;
     font-weight: 700;
     color: #4f8cff;
+}
+
+/* ================= MODALS ================= */
+.modal-content {
+    background: var(--card);
+    color: var(--text);
+}
+
+hr {
+    border-color: var(--border);
 }
 </style>
 </head>
@@ -109,96 +183,140 @@ body {
 
 <div class="app-container">
 
-    <!-- Header -->
-    <div class="app-header">🥛 Milk Tracker</div>
-
-    <div class="p-3">
-
-        <!-- Price Card -->
-        <div class="card mb-3 p-3">
-            <label class="fw-semibold mb-2">Price per Liter</label>
-            <div class="d-flex gap-2">
-                <input type="number" class="form-control" id="price">
-                <button class="btn btn-primary" onclick="updatePrice()">Update</button>
-            </div>
-        </div>
-
-        <!-- Calendar Card -->
-        <div class="card mb-3 p-3">
-            <div class="calendar-header mb-2">
-                <button class="btn btn-sm btn-outline-secondary" onclick="changeMonth(-1)">◀</button>
-                <div id="monthYear"></div>
-                <button class="btn btn-sm btn-outline-secondary" onclick="changeMonth(1)">▶</button>
-            </div>
-
-            <div class="calendar-grid mb-2">
-                <div class="day-name">Sun</div>
-                <div class="day-name">Mon</div>
-                <div class="day-name">Tue</div>
-                <div class="day-name">Wed</div>
-                <div class="day-name">Thu</div>
-                <div class="day-name">Fri</div>
-                <div class="day-name">Sat</div>
-            </div>
-
-            <div class="calendar-grid" id="calendar"></div>
-        </div>
-
-        <!-- Summary Card -->
-        <div class="card p-3">
-            <div class="d-flex justify-content-between">
-                <span>Milk Days</span>
-                <span class="summary-value" id="days">0</span>
-            </div>
-            <div class="d-flex justify-content-between">
-                <span>Total Quantity</span>
-                <span class="summary-value" id="quantity">0 L</span>
-            </div>
-            <div class="d-flex justify-content-between mb-2">
-                <span>Price / Liter</span>
-                <span class="summary-value">₹ <span id="priceDisplay">0</span></span>
-            </div>
-            <hr>
-            <div class="d-flex justify-content-between total">
-                <span>Total Bill</span>
-                <span>₹ <span id="bill">0</span></span>
-            </div>
-        </div>
-
+<!-- HEADER -->
+<div class="app-header">
+    <span>🥛 Milk Tracker</span>
+    <div class="header-actions">
+        <div class="icon-btn" onclick="toggleTheme()" title="Theme">🌗</div>
+        <div class="icon-btn" data-bs-toggle="modal" data-bs-target="#profileModal">👤</div>
     </div>
 </div>
 
-<!-- Quantity Modal -->
-<div class="modal fade" id="quantityModal" tabindex="-1">
+<div class="p-3">
+
+<!-- PRICE -->
+<div class="card mb-3 p-3">
+    <label class="fw-semibold mb-2">Price per Liter</label>
+    <div class="d-flex gap-2">
+        <input type="number" class="form-control" id="price">
+        <button class="btn btn-primary" onclick="updatePrice()">Update</button>
+    </div>
+</div>
+
+<!-- REMINDER -->
+<div class="card mb-3 p-3">
+    <div class="d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">Daily Reminder</span>
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="reminderToggle">
+        </div>
+    </div>
+    <input type="time" class="form-control mt-2" id="reminderTime">
+    <small class="text-muted">Triggers only if milk not added today</small>
+</div>
+
+<!-- CALENDAR -->
+<div class="card mb-3 p-3">
+    <div class="d-flex justify-content-between mb-2 fw-semibold">
+        <button class="btn btn-sm btn-outline-secondary" onclick="changeMonth(-1)">◀</button>
+        <div id="monthYear"></div>
+        <button class="btn btn-sm btn-outline-secondary" onclick="changeMonth(1)">▶</button>
+    </div>
+
+    <div class="calendar-grid mb-2">
+        <div class="day-name">Sun</div><div class="day-name">Mon</div><div class="day-name">Tue</div>
+        <div class="day-name">Wed</div><div class="day-name">Thu</div><div class="day-name">Fri</div><div class="day-name">Sat</div>
+    </div>
+
+    <div class="calendar-grid" id="calendar"></div>
+</div>
+
+<!-- SUMMARY -->
+<div class="card p-3">
+    <div class="d-flex justify-content-between">
+        <span>Milk Days</span><span id="days">0</span>
+    </div>
+    <div class="d-flex justify-content-between">
+        <span>Total Quantity</span><span id="quantity">0 L</span>
+    </div>
+    <div class="d-flex justify-content-between mb-2">
+        <span>Price / Liter</span>
+        <span>₹ <span id="priceDisplay">0</span></span>
+    </div>
+    <hr>
+    <div class="d-flex justify-content-between total">
+        <span>Total Bill</span>
+        <span>₹ <span id="bill">0</span></span>
+    </div>
+</div>
+
+</div>
+</div>
+
+<!-- PROFILE MODAL -->
+<div class="modal fade" id="profileModal">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content rounded-4">
-      <div class="modal-header border-0">
-        <h5 class="modal-title">Select Quantity</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      <div class="modal-header">
+        <h5>Profile</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body text-center">
-        <button class="btn btn-success w-100 mb-3 py-3 fs-5"
-                onclick="setQuantity(1)">
-          1 Liter
-        </button>
-        <button class="btn btn-primary w-100 mb-3 py-3 fs-5"
-                onclick="setQuantity(2)">
-          2 Liters
-        </button>
-        <button class="btn btn-outline-secondary w-100"
-                onclick="setQuantity(0)">
-          No Milk
-        </button>
+        <p class="fw-semibold">{{ username }}</p>
+        <a href="/logout" class="btn btn-danger w-100">Logout</a>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Bootstrap JS -->
+<!-- QUANTITY MODAL -->
+<div class="modal fade" id="quantityModal">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content rounded-4">
+      <div class="modal-header border-0">
+        <h5>Select Quantity</h5>
+        <button class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center">
+        <button class="btn btn-success w-100 mb-2" onclick="setQuantity(1)">1 Liter</button>
+        <button class="btn btn-primary w-100 mb-2" onclick="setQuantity(2)">2 Liters</button>
+        <button class="btn btn-outline-secondary w-100" onclick="setQuantity(0)">No Milk</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-/* -------- INITIAL DATA FROM SERVER -------- */
+/* ===== THEME ===== */
+function toggleTheme() {
+    document.body.classList.toggle("dark");
+    localStorage.setItem("theme",
+        document.body.classList.contains("dark") ? "dark" : "light"
+    );
+}
+if (localStorage.getItem("theme") === "dark") {
+    document.body.classList.add("dark");
+}
+
+/* ===== REMINDER STATE (PERSIST FIX) ===== */
+const reminderToggle = document.getElementById("reminderToggle");
+const reminderTime = document.getElementById("reminderTime");
+
+// restore
+reminderToggle.checked = localStorage.getItem("reminder_enabled") === "true";
+reminderTime.value = localStorage.getItem("reminder_time") || "";
+
+// save
+reminderToggle.addEventListener("change", () => {
+    localStorage.setItem("reminder_enabled", reminderToggle.checked);
+});
+reminderTime.addEventListener("change", () => {
+    localStorage.setItem("reminder_time", reminderTime.value);
+});
+
+/* ===== EXISTING LOGIC ===== */
 const SERVER_YEAR = Number(document.body.dataset.year);
 const SERVER_MONTH = Number(document.body.dataset.month);
 
@@ -207,7 +325,6 @@ let milkData = {};
 let editable = false;
 let selectedKey = null;
 
-/* -------- LOAD MONTH DATA -------- */
 async function loadMonth() {
     const y = currentDate.getFullYear();
     const m = currentDate.getMonth() + 1;
@@ -218,64 +335,47 @@ async function loadMonth() {
     milkData = data.days;
     editable = data.editable;
 
-    document.getElementById("price").value = data.summary.price;
-    document.getElementById("priceDisplay").innerText = data.summary.price;
-    document.getElementById("days").innerText = data.summary.milk_days;
-    document.getElementById("quantity").innerText = data.summary.total_quantity + " L";
-    document.getElementById("bill").innerText = data.summary.total_bill;
+    price.value = data.summary.price;
+    priceDisplay.innerText = data.summary.price;
+    days.innerText = data.summary.milk_days;
+    quantity.innerText = data.summary.total_quantity + " L";
+    bill.innerText = data.summary.total_bill;
 
     renderCalendar();
 }
 
-/* -------- CALENDAR RENDER -------- */
 function renderCalendar() {
-    const calendar = document.getElementById("calendar");
     calendar.innerHTML = "";
+    monthYear.innerText =
+        currentDate.toLocaleString("default", { month: "long", year: "numeric" });
 
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
-
-    document.getElementById("monthYear").innerText =
-        currentDate.toLocaleString("default", { month: "long", year: "numeric" });
-
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
 
-    for (let i = 0; i < firstDay; i++) {
-        calendar.appendChild(document.createElement("div"));
-    }
+    for (let i = 0; i < firstDay; i++) calendar.appendChild(document.createElement("div"));
 
-    for (let day = 1; day <= daysInMonth; day++) {
+    for (let d = 1; d <= daysInMonth; d++) {
         const div = document.createElement("div");
         div.className = "day";
-        div.innerHTML = `<div>${day}</div>`;
+        div.innerHTML = `<div>${d}</div>`;
 
-        const key = `${year}-${String(month + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+        const key = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
 
         if (milkData[key]) {
             div.classList.add(milkData[key] === 1 ? "selected-1" : "selected-2");
             div.innerHTML += `<div class="qty">${milkData[key]}L</div>`;
         }
 
-        const today = new Date();
-        if (day === today.getDate() &&
-            month === today.getMonth() &&
-            year === today.getFullYear()) {
-            div.classList.add("today");
-        }
-
-        if (editable) {
-            div.onclick = () => openModal(key);
-        }
-
+        if (editable) div.onclick = () => openModal(key);
         calendar.appendChild(div);
     }
 }
 
-/* -------- MODAL -------- */
 function openModal(key) {
     selectedKey = key;
-    new bootstrap.Modal(document.getElementById("quantityModal")).show();
+    new bootstrap.Modal(quantityModal).show();
 }
 
 async function setQuantity(qty) {
@@ -284,28 +384,21 @@ async function setQuantity(qty) {
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({ date: selectedKey, quantity: qty })
     });
-
-    bootstrap.Modal.getInstance(
-        document.getElementById("quantityModal")
-    ).hide();
-
+    bootstrap.Modal.getInstance(quantityModal).hide();
     loadMonth();
 }
 
-/* -------- PRICE -------- */
 async function updatePrice() {
-    const price = document.getElementById("price").value;
     await fetch("/api/price", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({ price: price })
+        body: JSON.stringify({ price: price.value })
     });
     loadMonth();
 }
 
-/* -------- MONTH NAV -------- */
-function changeMonth(offset) {
-    currentDate.setMonth(currentDate.getMonth() + offset);
+function changeMonth(o) {
+    currentDate.setMonth(currentDate.getMonth() + o);
     loadMonth();
 }
 

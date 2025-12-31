@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, session
 from flask_sqlalchemy import SQLAlchemy
 from datetime import date, datetime
 from sqlalchemy.engine.url import URL
@@ -7,7 +7,7 @@ app = Flask(__name__)
 app.secret_key = "milk-secret-key"
 
 # --------------------------------------------------
-# DATABASE CONFIG (SUPABASE via IP – DNS SAFE)
+# DATABASE CONFIG (UNCHANGED – SUPABASE via IP)
 # --------------------------------------------------
 
 DATABASE = {
@@ -18,10 +18,9 @@ DATABASE = {
     "query": {"sslmode": "require"}
 }
 
-# IMPORTANT: hostaddr forces IP usage (bypasses DNS)
 ENGINE_OPTIONS = {
     "connect_args": {
-        "hostaddr": "3.111.225.200",  # from nslookup
+        "hostaddr": "3.111.225.200",
         "port": 5432
     }
 }
@@ -33,11 +32,6 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
 # --------------------------------------------------
-# CONSTANTS
-# --------------------------------------------------
-DEFAULT_USER_ID = 1
-
-# --------------------------------------------------
 # MODELS
 # --------------------------------------------------
 
@@ -45,6 +39,11 @@ class User(db.Model):
     __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String, unique=True)
+    pin = db.Column(db.String(4), nullable=False)
+
+    # 🔔 Reminder fields
+    reminder_enabled = db.Column(db.Boolean, default=False)
+    reminder_time = db.Column(db.Time, nullable=True)
 
 class MilkLog(db.Model):
     __tablename__ = "milk_log"
@@ -62,28 +61,123 @@ class MonthlyPrice(db.Model):
     price = db.Column(db.Integer)
 
 # --------------------------------------------------
-# ROUTES
+# AUTH
 # --------------------------------------------------
 
 @app.route("/")
-def splash():
-    return render_template("splash.html")
+def root():
+    return redirect("/auth")
+
+@app.route("/auth", methods=["GET", "POST"])
+def auth():
+    if request.method == "GET":
+        return render_template("auth.html")
+
+    data = request.json
+    mode = data.get("mode")
+    pin = data.get("pin", "").strip()
+    name = data.get("name", "").strip()
+
+    if not pin.isdigit() or len(pin) != 4:
+        return jsonify({"error": "PIN must be exactly 4 digits"}), 400
+
+    # ---------- REGISTER ----------
+    if mode == "register":
+        if not name:
+            return jsonify({"error": "Name required"}), 400
+
+        if User.query.filter_by(pin=pin).first():
+            return jsonify({"error": "PIN already exists"}), 400
+
+        user = User(name=name, pin=pin)
+        db.session.add(user)
+        db.session.commit()
+
+        session["user_id"] = user.id
+        session["username"] = user.name
+
+        return jsonify({"success": True})
+
+    # ---------- LOGIN ----------
+    user = User.query.filter_by(pin=pin).first()
+    if not user:
+        return jsonify({"error": "Invalid PIN"}), 401
+
+    session["user_id"] = user.id
+    session["username"] = user.name
+
+    return jsonify({"success": True})
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/auth")
+
+# --------------------------------------------------
+# DASHBOARD
+# --------------------------------------------------
 
 @app.route("/dashboard")
 def dashboard():
-    today = date.today()
-    year = int(request.args.get("year", today.year))
-    month = int(request.args.get("month", today.month))
+    if "user_id" not in session:
+        return redirect("/auth")
 
-    return render_template("dashboard.html", year=year, month=month)
+    today = date.today()
+    return render_template(
+        "dashboard.html",
+        year=today.year,
+        month=today.month,
+        username=session["username"]
+    )
 
 # --------------------------------------------------
-# API: MONTH DATA
+# 🔔 REMINDER APIs
+# --------------------------------------------------
+
+@app.route("/api/reminder", methods=["GET"])
+def get_reminder():
+    if "user_id" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    user = User.query.get(session["user_id"])
+
+    return jsonify({
+        "enabled": user.reminder_enabled,
+        "time": user.reminder_time.strftime("%H:%M") if user.reminder_time else None
+    })
+
+@app.route("/api/reminder", methods=["POST"])
+def set_reminder():
+    if "user_id" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    data = request.json
+    enabled = bool(data.get("enabled"))
+    time_str = data.get("time")
+
+    user = User.query.get(session["user_id"])
+
+    user.reminder_enabled = enabled
+
+    if enabled and time_str:
+        user.reminder_time = datetime.strptime(time_str, "%H:%M").time()
+    else:
+        user.reminder_time = None
+
+    db.session.commit()
+
+    return jsonify({"success": True})
+
+# --------------------------------------------------
+# API: MONTH
 # --------------------------------------------------
 
 @app.route("/api/month")
 def api_month():
-    user_id = DEFAULT_USER_ID
+    if "user_id" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    user_id = session["user_id"]
     year = int(request.args["year"])
     month = int(request.args["month"])
 
@@ -103,36 +197,36 @@ def api_month():
     ).first()
 
     price = price_row.price if price_row else 0
-
     total_qty = sum(days.values())
-    milk_days = len(days)
-    total_bill = total_qty * price
 
     return jsonify({
         "editable": editable,
         "days": days,
         "summary": {
-            "milk_days": milk_days,
+            "milk_days": len(days),
             "total_quantity": total_qty,
             "price": price,
-            "total_bill": total_bill
+            "total_bill": total_qty * price
         }
     })
 
 # --------------------------------------------------
-# API: SET DAY
+# API: DAY
 # --------------------------------------------------
 
 @app.route("/api/day", methods=["POST"])
 def api_day():
-    user_id = DEFAULT_USER_ID
+    if "user_id" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    user_id = session["user_id"]
     data = request.json
 
     day = datetime.strptime(data["date"], "%Y-%m-%d").date()
     qty = int(data["quantity"])
 
     today = date.today()
-    if not (day.year == today.year and day.month == today.month):
+    if day.year != today.year or day.month != today.month:
         return jsonify({"error": "Read only"}), 403
 
     log = MilkLog.query.filter_by(user_id=user_id, day=day).first()
@@ -144,30 +238,26 @@ def api_day():
         if log:
             log.quantity = qty
         else:
-            db.session.add(MilkLog(
-                user_id=user_id,
-                day=day,
-                quantity=qty
-            ))
+            db.session.add(MilkLog(user_id=user_id, day=day, quantity=qty))
 
     db.session.commit()
     return jsonify({"success": True})
 
 # --------------------------------------------------
-# API: UPDATE PRICE
+# API: PRICE
 # --------------------------------------------------
 
 @app.route("/api/price", methods=["POST"])
 def api_price():
-    user_id = DEFAULT_USER_ID
-    price = int(request.json["price"])
+    if "user_id" not in session:
+        return jsonify({"error": "Unauthorized"}), 401
 
+    user_id = session["user_id"]
+    price = int(request.json["price"])
     today = date.today()
 
     row = MonthlyPrice.query.filter_by(
-        user_id=user_id,
-        year=today.year,
-        month=today.month
+        user_id=user_id, year=today.year, month=today.month
     ).first()
 
     if row:
