@@ -41,10 +41,6 @@ class User(db.Model):
     name = db.Column(db.String, unique=True)
     pin = db.Column(db.String(4), nullable=False)
 
-    # 🔔 Reminder fields
-    reminder_enabled = db.Column(db.Boolean, default=False)
-    reminder_time = db.Column(db.Time, nullable=True)
-
 class MilkLog(db.Model):
     __tablename__ = "milk_log"
     id = db.Column(db.Integer, primary_key=True)
@@ -129,44 +125,6 @@ def dashboard():
         month=today.month,
         username=session["username"]
     )
-
-# --------------------------------------------------
-# 🔔 REMINDER APIs
-# --------------------------------------------------
-
-@app.route("/api/reminder", methods=["GET"])
-def get_reminder():
-    if "user_id" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    user = User.query.get(session["user_id"])
-
-    return jsonify({
-        "enabled": user.reminder_enabled,
-        "time": user.reminder_time.strftime("%H:%M") if user.reminder_time else None
-    })
-
-@app.route("/api/reminder", methods=["POST"])
-def set_reminder():
-    if "user_id" not in session:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    data = request.json
-    enabled = bool(data.get("enabled"))
-    time_str = data.get("time")
-
-    user = User.query.get(session["user_id"])
-
-    user.reminder_enabled = enabled
-
-    if enabled and time_str:
-        user.reminder_time = datetime.strptime(time_str, "%H:%M").time()
-    else:
-        user.reminder_time = None
-
-    db.session.commit()
-
-    return jsonify({"success": True})
 
 # --------------------------------------------------
 # API: MONTH

@@ -187,7 +187,7 @@ hr {
 <div class="app-header">
     <span>🥛 Milk Tracker</span>
     <div class="header-actions">
-        <div class="icon-btn" onclick="toggleTheme()" title="Theme">🌗</div>
+        <div class="icon-btn" onclick="toggleTheme()">🌗</div>
         <div class="icon-btn" data-bs-toggle="modal" data-bs-target="#profileModal">👤</div>
     </div>
 </div>
@@ -201,18 +201,6 @@ hr {
         <input type="number" class="form-control" id="price">
         <button class="btn btn-primary" onclick="updatePrice()">Update</button>
     </div>
-</div>
-
-<!-- REMINDER -->
-<div class="card mb-3 p-3">
-    <div class="d-flex justify-content-between align-items-center">
-        <span class="fw-semibold">Daily Reminder</span>
-        <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" id="reminderToggle">
-        </div>
-    </div>
-    <input type="time" class="form-control mt-2" id="reminderTime">
-    <small class="text-muted">Triggers only if milk not added today</small>
 </div>
 
 <!-- CALENDAR -->
@@ -289,7 +277,7 @@ hr {
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
-/* ===== THEME ===== */
+/* ================= THEME ================= */
 function toggleTheme() {
     document.body.classList.toggle("dark");
     localStorage.setItem("theme",
@@ -300,23 +288,8 @@ if (localStorage.getItem("theme") === "dark") {
     document.body.classList.add("dark");
 }
 
-/* ===== REMINDER STATE (PERSIST FIX) ===== */
-const reminderToggle = document.getElementById("reminderToggle");
-const reminderTime = document.getElementById("reminderTime");
 
-// restore
-reminderToggle.checked = localStorage.getItem("reminder_enabled") === "true";
-reminderTime.value = localStorage.getItem("reminder_time") || "";
-
-// save
-reminderToggle.addEventListener("change", () => {
-    localStorage.setItem("reminder_enabled", reminderToggle.checked);
-});
-reminderTime.addEventListener("change", () => {
-    localStorage.setItem("reminder_time", reminderTime.value);
-});
-
-/* ===== EXISTING LOGIC ===== */
+/* ================= EXISTING LOGIC ================= */
 const SERVER_YEAR = Number(document.body.dataset.year);
 const SERVER_MONTH = Number(document.body.dataset.month);
 
